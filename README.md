@@ -43,7 +43,7 @@ python3 license.py genkey
 ### Let's assume that your software_id is: 4JZ2-H049
 
 ```
-loskiq@debian12:~# python3 license.py licgenros 4JZ2-H049 9DBC845E9018537810FDAE62824322EEE1B12BAD81FCA28EC295FB397C61CE0B
+# python3 license.py licgenros 4JZ2-H049 9DBC845E9018537810FDAE62824322EEE1B12BAD81FCA28EC295FB397C61CE0B
 -----BEGIN MIKROTIK SOFTWARE KEY------------
 50eNy667HxTQwmCtCpT15YaVx6lpPHQoy2w/KIsjoOHs
 Eq/cU24G3/aIjHVeXXqjPRTubErxzaqjHD3aWIi1KA==
@@ -56,7 +56,7 @@ loskiq@debian12:~#
 ### Let's assume that your system_id is: pjLQ21gHzfI
 
 ```
-loskiq@debian12:~# python3 license.py licgenchr pjLQ21gHzfI 9DBC845E9018537810FDAE62824322EEE1B12BAD81FCA28EC295FB397C61CE0B
+# python3 license.py licgenchr pjLQ21gHzfI 9DBC845E9018537810FDAE62824322EEE1B12BAD81FCA28EC295FB397C61CE0B
 -----BEGIN MIKROTIK SOFTWARE KEY------------
 hdMf+/8rDWLOCOuNt8qP82NgHbN8YdQfJcZNRyWzBerz
 BfwOQF1ehUjNubOGkCf4zkPQrK7U+2hbM/uh7gJWGA==
