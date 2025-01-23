@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [x86, arm, arm64, mipsbe, mmips, smips, tile, ppc]
+        arch: [x86, arm, arm64, mipsbe, mmips, smips, ppc]
 
     steps:
     - name: Checkout
@@ -68,8 +68,6 @@ jobs:
           ARCH='-mmips'
         elif [ "${{ matrix.arch }}" == "smips" ]; then
           ARCH='-smips'
-        elif [ "${{ matrix.arch }}" == "tile" ]; then
-          ARCH='-tile'
         elif [ "${{ matrix.arch }}" == "ppc" ]; then
           ARCH='-ppc'
         fi

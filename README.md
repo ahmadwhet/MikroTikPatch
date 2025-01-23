@@ -6,8 +6,7 @@
 - ARM (bootloop)
 - MIPSBE (bootloop on some devices)
 - MMIPS (bootloop)
-- SMIPS (not tested yet)
-- TILE (not tested yet)
+- SMIPS (bootloop)
 - PPC (not tested yet)
 
 # Download
