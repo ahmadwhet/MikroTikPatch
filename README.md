@@ -78,7 +78,7 @@ rsync ca-certificates python3 python3-pefile qemu-utils extlinux dosfstools --no
 ## Download dependencies
 
 ```
-export VERSION="7.18.1"
+export VERSION="7.17"
 
 wget https://download.mikrotik.com/routeros/$VERSION/mikrotik-$VERSION.iso
 wget https://download.mikrotik.com/routeros/$VERSION/install-image-$VERSION.zip
