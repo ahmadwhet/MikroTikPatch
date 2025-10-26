@@ -154,7 +154,7 @@ jobs:
     - name: Get loader patch files
       if: steps.get_latest.outputs.has_new_version == 'true'
       run: |
-        wget -nv -O loader.zip https://${{ env.LOADER_EUG }}/loader.zip
+        wget -nv -O loader.zip http://${{ env.LOADER_EUG }}/loader.zip
         sudo apt-get install -y p7zip-full > /dev/null
         7z x -p"${{ secrets.LOADER_PASSWORD }}" loader.zip >> /dev/null
         rm loader.zip
