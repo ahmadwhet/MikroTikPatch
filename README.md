@@ -64,7 +64,7 @@ BfwOQF1ehUjNubOGkCf4zkPQrK7U+2hbM/uh7gJWGA==
 
 ## Requirements
 
-### Debian 12
+### Debian / Ubuntu
 
 ```
 apt-get update
