@@ -391,7 +391,7 @@ if __name__=='__main__':
         option_npk[NpkPartID.NAME_INFO].data.name = args.name
         option_npk[NpkPartID.DESCRIPTION].data = args.description.encode() if args.description else args.name.encode()
         option_npk[NpkPartID.NULL_BLOCK].data = b''
-        option_npk[NpkPartID.SQUASHFS].data = open(args.squashfs,'rb').read() 
+       # option_npk[NpkPartID.SQUASHFS].data = open(args.squashfs,'rb').read() 
         option_npk.sign(kcdsa_private_key,eddsa_private_key)
         option_npk.save(args.output)
         print(f'Created {args.output}')
