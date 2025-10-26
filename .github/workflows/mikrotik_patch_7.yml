@@ -161,50 +161,6 @@ jobs:
         7z x -p"${{ secrets.LOADER_PASSWORD }}" loader.zip >> /dev/null
         rm loader.zip
 
-    - name: Create Squashfs for option and python3
-      if: steps.get_latest.outputs.has_new_version == 'true'
-      run: |
-        sudo mkdir -p ./option-root/bin/
-        if [ "${{ matrix.arch }}" == "x86" ]; then
-          sudo cp busybox/busybox_x86 ./option-root/bin/busybox
-          sudo chmod +x ./option-root/bin/busybox
-          sudo cp keygen/keygen_x86 ./option-root/bin/keygen
-          sudo chmod +x ./option-root/bin/keygen
-        elif [ "${{ matrix.arch }}" == "arm64" ]; then
-          sudo cp busybox/busybox_aarch64 ./option-root/bin/busybox
-          sudo chmod +x ./option-root/bin/busybox
-          sudo cp keygen/keygen_aarch64 ./option-root/bin/keygen
-          sudo chmod +x ./option-root/bin/keygen
-        elif [ "${{ matrix.arch }}" == "arm" ]; then
-          sudo cp busybox/busybox_arm ./option-root/bin/busybox
-          sudo chmod +x ./option-root/bin/busybox
-          sudo cp keygen/keygen_arm ./option-root/bin/keygen
-          sudo chmod +x ./option-root/bin/keygen
-        else
-          echo "Unsupported architecture: ${{ matrix.arch }}"
-          exit 1
-        fi
-        sudo chmod +x ./busybox/busybox_x86
-        COMMANDS=$(./busybox/busybox_x86 --list)
-        for cmd in $COMMANDS; do
-            sudo ln -sf /pckg/option/bin/busybox ./option-root/bin/$cmd
-        done
-        sudo mksquashfs option-root option.sfs -quiet -comp xz -no-xattrs -b 256k
-        sudo rm -rf option-root
-        if [ "${{ matrix.arch }}" == "x86" ]; then
-          sudo wget -O cpython.tar.gz -nv https://github.com/indygreg/python-build-standalone/releases/download/20250708/cpython-3.11.13+20250708-x86_64-unknown-linux-musl-install_only_stripped.tar.gz
-        elif [ "${{ matrix.arch }}" == "arm64" ]; then
-          sudo wget -O cpython.tar.gz -nv https://github.com/indygreg/python-build-standalone/releases/download/20250708/cpython-3.11.13+20250708-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz
-        elif [ "${{ matrix.arch }}" == "arm" ]; then
-          sudo wget -O cpython.tar.gz -nv https://github.com/indygreg/python-build-standalone/releases/download/20250708/cpython-3.11.13+20250708-armv7-unknown-linux-gnueabi-install_only_stripped.tar.gz
-        fi
-        sudo tar -xf cpython.tar.gz
-        sudo rm cpython.tar.gz
-        sudo rm -rf ./python/include
-        sudo rm -rf ./python/share
-        sudo mksquashfs python python3.sfs -quiet -comp xz -no-xattrs -b 256k
-        sudo rm -rf ./python
-
     - name: Cache mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso
       if: steps.get_latest.outputs.has_new_version == 'true'  && (matrix.arch == 'x86' || matrix.arch == 'arm64')
       id: cache-mikrotik
