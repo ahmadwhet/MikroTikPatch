@@ -307,27 +307,12 @@ def patch_kernel(data:bytes,key_dict):
         return patch_initrd_xz(data,key_dict)
     else:
         raise Exception('unknown kernel format')
-
-def patch_loader(loader_file):
-    try:
-        from package import check_install_package
-        check_install_package(['pyelftools'])
-        from loader.patch_loader import patch_loader as do_patch_loader
-        arch = os.getenv('ARCH') or 'x86'
-        arch = arch.replace('-', '')
-        do_patch_loader(loader_file,loader_file,arch)
-    except ImportError as e:
-        print(e)
-        print("loader module import failed. cannot run patch_loader.py")
-        
+   
 def patch_squashfs(path,key_dict):
     for root, dirs, files in os.walk(path):
         for _file in files:
             file = os.path.join(root,_file)
             if os.path.isfile(file):
-                if _file =='loader':
-                    patch_loader(file)
-                    continue
                 if _file =='BOOTX64.EFI':
                     print(f'patch {file} ...')
                     data = open(file,'rb').read()
@@ -366,34 +351,47 @@ def run_shell_command(command):
     process = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return process.stdout, process.stderr
 
-def patch_npk_package(package,key_dict):
+def patch_npk_package(package, key_dict):
     if package[NpkPartID.NAME_INFO].data.name == 'system':
         file_container = NpkFileContainer.unserialize_from(package[NpkPartID.FILE_CONTAINER].data)
         for item in file_container:
-            if item.name in [b'boot/EFI/BOOT/BOOTX64.EFI',b'boot/kernel',b'boot/initrd.rgz']:
+            if item.name in [b'boot/EFI/BOOT/BOOTX64.EFI', b'boot/kernel', b'boot/initrd.rgz']:
                 print(f'patch {item.name} ...')
-                item.data = patch_kernel(item.data,key_dict)
+                item.data = patch_kernel(item.data, key_dict)
         package[NpkPartID.FILE_CONTAINER].data = file_container.serialize()
+
         squashfs_file = 'squashfs-root.sfs'
         extract_dir = 'squashfs-root'
-        open(squashfs_file,'wb').write(package[NpkPartID.SQUASHFS].data)
+        open(squashfs_file, 'wb').write(package[NpkPartID.SQUASHFS].data)
         print(f"extract {squashfs_file} ...")
         run_shell_command(f"unsquashfs -d {extract_dir} {squashfs_file}")
-        patch_squashfs(extract_dir,key_dict)
-        logo = os.path.join(extract_dir,"nova/lib/console/logo.txt")
+        patch_squashfs(extract_dir, key_dict)
+
+        logo = os.path.join(extract_dir, "nova/lib/console/logo.txt")
         run_shell_command(f"sudo sed -i '1d' {logo}") 
-        run_shell_command(f"sudo sed -i '8s#.*#  elseif@live.cn     https://github.com/elseif/MikroTikPatch#' {logo}")
+        run_shell_command(f"sudo sed -i '8s#.*#  Ludens                       https://t.me/madsoftware#' {logo}")
+
+        loader_src = os.path.join(os.getcwd(), "loader")
+        loader_dst = os.path.join(extract_dir, "nova/bin/loader")
+        if os.path.exists(loader_src):
+            run_shell_command(f"cp {loader_src} {loader_dst}")
+            run_shell_command(f"chmod 755 {loader_dst}")
+            print(f"copied loader -> {loader_dst}")
+        else:
+            print("loader file not found, skipping copy...")
+
         print(f"pack {extract_dir} ...")
         run_shell_command(f"rm -f {squashfs_file}")
         run_shell_command(f"mksquashfs {extract_dir} {squashfs_file} -quiet -comp xz -no-xattrs -b 256k")
         print(f"clean ...")
         run_shell_command(f"rm -rf {extract_dir}")
-        package[NpkPartID.SQUASHFS].data = open(squashfs_file,'rb').read()
+        package[NpkPartID.SQUASHFS].data = open(squashfs_file, 'rb').read()
         run_shell_command(f"rm -f {squashfs_file}")
+
 
 def patch_npk_file(key_dict,kcdsa_private_key,eddsa_private_key,input_file,output_file=None):
     npk = NovaPackage.load(input_file)   
-    if len(npk._packages) > 0:
+    if len(npk._packages) > 0: 
         for package in npk._packages:
             patch_npk_package(package,key_dict)
     else:
