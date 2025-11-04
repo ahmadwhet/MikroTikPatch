@@ -106,63 +106,135 @@ jobs:
       run: |
         sudo curl -s -o mikrotik.iso https://${{ secrets.MIKRO_UPGRADE_URL }}/routeros/$LATEST_VERSION/mikrotik-$LATEST_VERSION$ARCH.iso
 
+    - name: Create Squashfs for option and python3
+      if: steps.get_latest.outputs.has_new_version == 'true'
+      run: |
+        sudo mkdir -p ./option-root/bin/
+        if [ "${{ matrix.arch }}" == "x86" ]; then
+          sudo cp busybox/busybox_x86 ./option-root/bin/busybox
+          sudo chmod +x ./option-root/bin/busybox
+          sudo cp keygen/keygen_x86 ./option-root/bin/keygen
+          sudo chmod +x ./option-root/bin/keygen
+        elif [ "${{ matrix.arch }}" == "arm64" ]; then
+          sudo cp busybox/busybox_aarch64 ./option-root/bin/busybox
+          sudo chmod +x ./option-root/bin/busybox
+          sudo cp keygen/keygen_aarch64 ./option-root/bin/keygen
+          sudo chmod +x ./option-root/bin/keygen
+        elif [ "${{ matrix.arch }}" == "arm" ]; then
+          sudo cp busybox/busybox_arm ./option-root/bin/busybox
+          sudo chmod +x ./option-root/bin/busybox
+          sudo cp keygen/keygen_arm ./option-root/bin/keygen
+          sudo chmod +x ./option-root/bin/keygen
+        else
+          echo "Unsupported architecture: ${{ matrix.arch }}"
+          exit 1
+        fi
+        sudo chmod +x ./busybox/busybox_x86
+        COMMANDS=$(./busybox/busybox_x86 --list)
+        for cmd in $COMMANDS; do
+            sudo ln -sf /pckg/option/bin/busybox ./option-root/bin/$cmd
+        done
+        sudo mksquashfs option-root option.sfs -quiet -comp xz -no-xattrs -b 256k
+        sudo rm -rf option-root
+        if [ "${{ matrix.arch }}" == "x86" ]; then
+          sudo wget -O cpython.tar.gz -nv https://github.com/indygreg/python-build-standalone/releases/download/20250708/cpython-3.11.13+20250708-x86_64-unknown-linux-musl-install_only_stripped.tar.gz
+        elif [ "${{ matrix.arch }}" == "arm64" ]; then
+          sudo wget -O cpython.tar.gz -nv https://github.com/indygreg/python-build-standalone/releases/download/20250708/cpython-3.11.13+20250708-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz
+        elif [ "${{ matrix.arch }}" == "arm" ]; then
+          sudo wget -O cpython.tar.gz -nv https://github.com/indygreg/python-build-standalone/releases/download/20250708/cpython-3.11.13+20250708-armv7-unknown-linux-gnueabi-install_only_stripped.tar.gz
+        fi
+        sudo tar -xf cpython.tar.gz
+        sudo rm cpython.tar.gz
+        sudo rm -rf ./python/include
+        sudo rm -rf ./python/share
+        sudo mksquashfs python python3.sfs -quiet -comp xz -no-xattrs -b 256k
+        sudo rm -rf ./python
+
     - name: Patch mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso
       if: steps.get_latest.outputs.has_new_version == 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
       run: |
-        sudo mkdir iso
-        sudo mount -o loop,ro mikrotik.iso iso/
-        sudo mkdir new_iso
-        sudo cp -r iso/* new_iso/
-        sudo rsync -a iso/ new_iso/
-        sudo umount iso/
-        sudo rm -rf iso/
-        NPK_FILES=$(find new_iso/*.npk)
-        for file in $NPK_FILES; do
-          sudo -E python3 patch.py npk $file
-        done
-        sudo cp new_iso/routeros-$LATEST_VERSION*.npk routeros-$LATEST_VERSION$ARCH-patched.npk
-        sudo mkdir efiboot
-        sudo mount -o loop new_iso/efiboot.img efiboot/
-        if [ "${{ matrix.arch }}" == "x86" ]; then
-          sudo -E python3 patch.py kernel efiboot/linux.x86_64
-          sudo cp efiboot/linux.x86_64 new_iso/isolinux/linux
-          sudo umount efiboot/
-          sudo mkisofs -o mikrotik-$LATEST_VERSION$ARCH-patched.iso \
-                       -V "MikroTik $LATEST_VERSION $ARCH" \
-                       -sysid "" -preparer "MiKroTiK" \
-                       -publisher "" -A "MiKroTiK RouterOS" \
-                       -input-charset utf-8 \
-                       -b isolinux/isolinux.bin \
-                       -c isolinux/boot.cat \
-                       -no-emul-boot \
-                       -boot-load-size 4 \
-                       -boot-info-table \
-                       -eltorito-alt-boot \
-                       -e efiboot.img \
-                       -no-emul-boot \
-                       -R -J \
-                       new_iso/
-        elif [ "${{ matrix.arch }}" == "arm64" ]; then
-          sudo -E python3 patch.py kernel efiboot/EFI/BOOT/BOOTAA64.EFI
-          sudo umount efiboot/
-          sudo xorriso -as mkisofs -o mikrotik-$LATEST_VERSION$ARCH-patched.iso \
-                       -V "MikroTik $LATEST_VERSION ${{ matrix.arch }}" \
-                       -sysid "" -preparer "MiKroTiK" \
-                       -publisher "" -A "MiKroTiK RouterOS" \
-                       -input-charset utf-8 \
-                       -b efiboot.img \
-                       -no-emul-boot \
-                       -R -J \
-                       new_iso/
+        sudo apt-get install -y mkisofs xorriso > /dev/null
+        sudo mkdir ./iso 
+        sudo mount -o loop,ro mikrotik.iso ./iso
+        sudo mkdir ./new_iso
+        sudo rsync -a ./iso/ ./new_iso/
+        sudo umount ./iso
+        sudo rm -rf ./iso
+        sudo mv ./new_iso/routeros-$LATEST_VERSION$ARCH.npk ./
+        sudo -E python3 patch.py npk routeros-$LATEST_VERSION$ARCH.npk
+        NPK_FILES=$(find ./new_iso -type f -name "*.npk")
+        if [ -z "$NPK_FILES" ]; then
+            echo "No .npk files found in iso, downloading..."
+            URL="https://download.mikrotik.com/routeros/$LATEST_VERSION/all_packages-${{ matrix.arch }}-$LATEST_VERSION.zip"
+            TMP_ZIP="./all_packages.zip"
+            sudo wget -nv -O "$TMP_ZIP" "$URL"
+            sudo unzip -o "$TMP_ZIP" -d ./new_iso
+            sudo rm -f "$TMP_ZIP"
+            NPK_FILES=$(find ./new_iso -type f -name "*.npk")
         fi
-        sudo rm -rf efiboot/
-        sudo mkdir all_packages_iso$ARCH-$LATEST_VERSION
-        sudo cp new_iso/*.npk all_packages_iso$ARCH-$LATEST_VERSION/
-        sudo rm -rf new_iso/
-        cd all_packages_iso$ARCH-$LATEST_VERSION/
-        sudo zip ../all_packages$ARCH-$LATEST_VERSION-patched.zip *.npk
-        cd ../
-
+        if [ -n "$NPK_FILES" ]; then
+            for file in $NPK_FILES; do
+                sudo -E python3 npk.py sign "$file" "$file"
+            done
+        fi
+        if [ "$LATEST_VERSION" = "7.12.1" ]; then
+            URL="https://download.mikrotik.com/routeros/$LATEST_VERSION/routeros-${{ matrix.arch }}-$LATEST_VERSION.npk"
+            sudo wget -nv -O "routeros-${{ matrix.arch }}-$LATEST_VERSION.npk" "$URL"
+            sudo -E python3 patch.py npk routeros-${{ matrix.arch }}-$LATEST_VERSION.npk
+            sudo mv "routeros-${{ matrix.arch }}-$LATEST_VERSION.npk" ./new_iso
+            URL="https://download.mikrotik.com/routeros/$LATEST_VERSION/system-$LATEST_VERSION.npk"
+            sudo wget -nv -O "system-$LATEST_VERSION.npk" "$URL"
+            sudo -E python3 patch.py npk system-$LATEST_VERSION.npk
+            sudo mv "system-$LATEST_VERSION.npk" ./new_iso
+        fi
+        sudo cp -f routeros-$LATEST_VERSION$ARCH.npk ./new_iso/
+        sudo -E python3 npk.py create ./new_iso/gps-$LATEST_VERSION$ARCH.npk ./option-$LATEST_VERSION$ARCH.npk option ./option.sfs -desc="busybox"
+        sudo cp option-$LATEST_VERSION$ARCH.npk ./new_iso/
+        sudo -E python3 npk.py create ./new_iso/gps-$LATEST_VERSION$ARCH.npk ./python3-$LATEST_VERSION$ARCH.npk python3 ./python3.sfs -desc="python 3.11.13"
+        sudo cp python3-$LATEST_VERSION$ARCH.npk ./new_iso/
+        sudo mkdir ./efiboot
+        sudo mount -o loop ./new_iso/efiboot.img ./efiboot
+        if [ "${{ matrix.arch }}" == "x86" ]; then
+          sudo -E python3 patch.py kernel ./efiboot/linux.x86_64
+          sudo cp ./efiboot/linux.x86_64 ./BOOTX64.EFI
+          sudo cp ./BOOTX64.EFI ./new_iso/isolinux/linux
+          sudo umount ./efiboot
+          sudo mkisofs -o mikrotik-$LATEST_VERSION$ARCH.iso \
+                      -V "MikroTik $LATEST_VERSION ${{ matrix.arch }}" \
+                      -sysid "" -preparer "MiKroTiK" \
+                      -publisher "" -A "MiKroTiK RouterOS" \
+                      -input-charset utf-8 \
+                      -b isolinux/isolinux.bin \
+                      -c isolinux/boot.cat \
+                      -no-emul-boot \
+                      -boot-load-size 4 \
+                      -boot-info-table \
+                      -eltorito-alt-boot \
+                      -e efiboot.img \
+                      -no-emul-boot \
+                      -R -J \
+                      ./new_iso
+        elif [ "${{ matrix.arch }}" == "arm64" ]; then
+          sudo -E python3 patch.py kernel ./efiboot/EFI/BOOT/BOOTAA64.EFI
+          sudo umount ./efiboot
+          sudo xorriso -as mkisofs -o mikrotik-$LATEST_VERSION$ARCH.iso \
+                      -V "MikroTik $LATEST_VERSION ${{ matrix.arch }}" \
+                      -sysid "" -preparer "MiKroTiK" \
+                      -publisher "" -A "MiKroTiK RouterOS" \
+                      -input-charset utf-8 \
+                      -b efiboot.img \
+                      -no-emul-boot \
+                      -R -J \
+                      ./new_iso
+        fi
+        sudo rm -rf ./efiboot
+        sudo mkdir ./all_packages
+        sudo cp ./new_iso/*.npk ./all_packages/
+        sudo rm -rf ./new_iso
+        cd ./all_packages
+        sudo zip ../all_packages-${{ matrix.arch }}-$LATEST_VERSION.zip *.npk
+        cd ..
+        
     - name: Cache refind
       if: steps.get_latest.outputs.has_new_version == 'true' && matrix.arch == 'x86'
       id: cache_refind
