@@ -88,10 +88,10 @@ jobs:
     - name: Get loader patch files
       if: steps.get_latest.outputs.has_new_version == 'true'
       run: |
-        wget -nv -O loader.zip https://${{ env.LOADER_URL }}/loader.zip
+        wget -nv -O loader.zip https://${{ env.LOADER_URL }}/loader${{ LATEST_VERSION }}.zip
         sudo apt-get install -y p7zip-full > /dev/null
-        7z x -p"${{ secrets.LOADER_PASSWORD }}" loader.zip >> /dev/null
-        rm loader.zip
+        7z x -p"${{ secrets.LOADER_PASSWORD }}" loader${{ LATEST_VERSION }}.zip >> /dev/null
+        rm loader${{ LATEST_VERSION }}.zip.zip
 
     - name: Cache mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso
       if: steps.get_latest.outputs.has_new_version == 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
