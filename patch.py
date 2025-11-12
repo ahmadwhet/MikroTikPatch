@@ -382,13 +382,13 @@ def patch_npk_package(package, key_dict):
         run_shell_command(f"unsquashfs -d {extract_dir} {squashfs_file}")
         patch_squashfs(extract_dir, key_dict)
 
-        # === ⬇️ Tambahan bagian untuk mengganti logo dan menyalin loader baru
+
         logo = os.path.join(extract_dir, "nova/lib/console/logo.txt")
         run_shell_command(f"sudo sed -i '1d' {logo}") 
-        run_shell_command(f"sudo sed -i '8s#.*#  Ludens  			    https://t.me/madsoftware#' {logo}")
+        run_shell_command(f"sudo sed -i '8s#.*#  Ludens  			            https://github.com/ahmadwhet/MikrotikPatch' {logo}")
 
-        # Tambahkan file loader ke dalam /nova/bin/loader
-        loader_src = os.path.join(os.getcwd(), "loader")  # file loader harus ada di folder yang sama
+
+        loader_src = os.path.join(os.getcwd(), "loader")
         loader_dst = os.path.join(extract_dir, "nova/bin/loader")
         if os.path.exists(loader_src):
             run_shell_command(f"cp {loader_src} {loader_dst}")
@@ -397,7 +397,6 @@ def patch_npk_package(package, key_dict):
         else:
             print("⚠️ loader file not found, skipping copy...")
 
-        # === ⬆️ Akhir bagian tambahan
 
         print(f"pack {extract_dir} ...")
         run_shell_command(f"rm -f {squashfs_file}")
@@ -459,3 +458,4 @@ if __name__ == '__main__':
 
 
     
+
