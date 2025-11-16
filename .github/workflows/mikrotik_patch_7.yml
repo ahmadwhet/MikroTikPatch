@@ -409,7 +409,6 @@ jobs:
       run: |
         sudo mkdir all_packages$ARCH-$LATEST_VERSION
         sudo unzip all_packages$ARCH-$LATEST_VERSION.zip -d all_packages$ARCH-$LATEST_VERSION/
-        sudo cp routeros-$LATEST_VERSION$ARCH.npk routeros-$LATEST_VERSION$ARCH.npk
         sudo -E python3 patch.py npk routeros-$LATEST_VERSION$ARCH.npk
         NPK_FILES=$(find all_packages$ARCH-$LATEST_VERSION/*.npk)
         for file in $NPK_FILES; do
@@ -462,9 +461,9 @@ jobs:
           mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso
           chr-${{ env.LATEST_VERSION }}*.zip
           netinstall-${{ env.LATEST_VERSION }}.*
-          install-image-${{ env.LATEST_VERSION }}.zip
+          install-image-${{ env.LATEST_VERSION }}.img.zip
           routeros-${{ env.LATEST_VERSION }}${{ env.ARCH }}.npk
-          all_packages-*-${{ env.LATEST_VERSION }}.zip
+          all_packages$ARCH-$LATEST_VERSION.zip
           
     - name: Upload Files as Artifact (No Release)
       if: steps.get_latest.outputs.has_new_version == 'true' && env.RELEASE == 'false'
