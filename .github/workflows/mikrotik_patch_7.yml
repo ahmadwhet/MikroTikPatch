@@ -420,7 +420,6 @@ jobs:
         cd all_packages$ARCH-$LATEST_VERSION/
         sudo zip ../all_packages$ARCH-$LATEST_VERSION-patched.zip *.npk
         cd ..
-        sudo rm -rf all_packages$ARCH-$LATEST_VERSION/
 
 
     - name: Prepare for Upload
@@ -428,12 +427,13 @@ jobs:
       run: |
         sudo mkdir -p ./publish/$LATEST_VERSION
         sudo cp CHANGELOG ./publish/$LATEST_VERSION/
-        sudo cp ./all_packages/*.npk ./publish/$LATEST_VERSION/
+        sudo cp ./all_packages$ARCH-$LATEST_VERSION/*.npk ./publish/$LATEST_VERSION/
         # sudo cp mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso ./publish/$LATEST_VERSION/ 2>/dev/null || true
         # sudo cp chr-${{ env.LATEST_VERSION }}*.zip ./publish/$LATEST_VERSION/ 2>/dev/null || true
         # sudo cp netinstall-${{ env.LATEST_VERSION }}.* ./publish/$LATEST_VERSION/ 2>/dev/null || true
         # sudo cp install-image-${{ env.LATEST_VERSION }}.zip ./publish/$LATEST_VERSION/ 2>/dev/null || true
         echo $LATEST_VERSION $BUILD_TIME | sudo tee ./publish/NEWESTa7.${{ matrix.channel }}
+        sudo rm -rf all_packages$ARCH-$LATEST_VERSION/
 
     - name: Delete Release tag ${{ env.LATEST_VERSION }} ${{ env.ARCH }}
       if: steps.get_latest.outputs.has_new_version == 'true' && env.RELEASE == 'true'
