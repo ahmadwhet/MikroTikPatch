@@ -427,6 +427,7 @@ jobs:
       run: |
         sudo mkdir -p ./publish/$LATEST_VERSION
         sudo cp CHANGELOG ./publish/$LATEST_VERSION/
+        sudo ls -la
         sudo cp ./all_packages$ARCH-$LATEST_VERSION/*.npk ./publish/$LATEST_VERSION/
         # sudo cp mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso ./publish/$LATEST_VERSION/ 2>/dev/null || true
         # sudo cp chr-${{ env.LATEST_VERSION }}*.zip ./publish/$LATEST_VERSION/ 2>/dev/null || true
