@@ -96,12 +96,6 @@ jobs:
           echo "RELEASE: $RELEASE"
           echo "MATRIX_JSON: $MATRIX_JSON"
           
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mkisofs xorriso qemu-utils extlinux --no-install-recommends
-          sudo pip install pefile
-          
   Patch_RouterOS:
     needs: Set_Variables
     runs-on: ubuntu-22.04
@@ -115,6 +109,12 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mkisofs xorriso qemu-utils extlinux --no-install-recommends
+        sudo pip install pefile
         
     - name: Set up Python
       uses: actions/setup-python@v5
