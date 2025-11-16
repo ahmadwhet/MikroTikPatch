@@ -70,7 +70,7 @@ jobs:
     steps:
       - name: Set variables
         id: set_vars
-        run: |
+        run: | 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             BUILD_TIME="${{ github.event.inputs.buildtime }}"
             RELEASE="${{ github.event.inputs.release }}"
@@ -295,262 +295,116 @@ jobs:
       run: |
         sudo curl -s -o refind-bin-0.14.2.zip https://nchc.dl.sourceforge.net/project/refind/0.14.2/refind-bin-0.14.2.zip
 
-
-    - name: Cache chr-${{ env.LATEST_VERSION }}${{ env.ARCH }}.img.zip
-      if: steps.get_latest.outputs.has_new_version == 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
-      id: cache-chr-img
+    - name: Cache install-image-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip
+      if: steps.get_latest.outputs.has_new_version == 'true' && matrix.arch == 'x86'
+      id: cache_install_image
       uses: actions/cache@v4
       with:
-        path: |
-          chr.img
-        key: chr-${{ env.LATEST_VERSION }}${{ env.ARCH }}.img
-        restore-keys: chr-${{ env.LATEST_VERSION }}${{ env.ARCH }}.img
+        path: install-image.zip
+        key: install-image-${{ env.LATEST_VERSION }}-${{ matrix.arch }}
 
-    - name: Get chr-${{ env.LATEST_VERSION }}${{ env.ARCH }}.img
-      if: steps.get_latest.outputs.has_new_version == 'true' && steps.cache-chr-img.outputs.cache-hit != 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
+    - name: Get install-image-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip
+      if: steps.get_latest.outputs.has_new_version == 'true' && steps.cache_install_image.outputs.cache-hit != 'true' && matrix.arch == 'x86'
       run: |
-          sudo wget -nv -O chr.img.zip https://download.mikrotik.com/routeros/$LATEST_VERSION/chr-$LATEST_VERSION$ARCH.img.zip
-          sudo unzip chr.img.zip
-          sudo rm chr.img.zip
-          sudo mv chr-$LATEST_VERSION$ARCH.img chr.img
+        sudo curl -s -o install-image.zip https://download.mikrotik.com/routeros/$LATEST_VERSION/install-image-$LATEST_VERSION.zip
 
-    - name: Create chr-${{ env.LATEST_VERSION }}${{ env.ARCH }}.img
+    - name: Patch install-image-${{ env.LATEST_VERSION }}${{ env.ARCH }}.img
+      if: steps.get_latest.outputs.has_new_version == 'true' && matrix.arch == 'x86'
+      run: |
+        sudo unzip install-image.zip
+        sudo modprobe nbd
+        sudo qemu-nbd -c /dev/nbd0 -f raw install-image-$LATEST_VERSION.img
+        sudo mkdir install-image
+        sudo mount /dev/nbd0 install-image/
+        sudo unzip refind-bin-0.14.2.zip refind-bin-0.14.2/refind/refind_x64.efi
+        sudo cp refind-bin-0.14.2/refind/refind_x64.efi install-image/EFI/BOOT/BOOTX64.EFI
+        sudo rm -rf refind-bin-0.14.2
+        sudo -E python3 patch.py kernel install-image/linux
+        NPK_FILES=$(find install-image/*.npk)
+        for file in $NPK_FILES; do
+          sudo -E python3 patch.py npk $file
+        done
+        sudo umount /dev/nbd0
+        sudo qemu-nbd -d /dev/nbd0
+        sudo rm -rf install-image/
+        sudo mv install-image-$LATEST_VERSION.img install-image-$LATEST_VERSION$ARCH-patched.img
+
+        sudo qemu-img convert -f raw -O qcow2 install-image-$LATEST_VERSION$ARCH-patched.img install-image-$LATEST_VERSION$ARCH-patched.qcow2
+        sudo qemu-img convert -f raw -O vmdk install-image-$LATEST_VERSION$ARCH-patched.img install-image-$LATEST_VERSION$ARCH-patched.vmdk
+        sudo qemu-img convert -f raw -O vpc install-image-$LATEST_VERSION$ARCH-patched.img install-image-$LATEST_VERSION$ARCH-patched.vhd
+        sudo qemu-img convert -f raw -O vhdx install-image-$LATEST_VERSION$ARCH-patched.img install-image-$LATEST_VERSION$ARCH-patched.vhdx
+        sudo qemu-img convert -f raw -O vdi install-image-$LATEST_VERSION$ARCH-patched.img install-image-$LATEST_VERSION$ARCH-patched.vdi
+
+        sudo zip install-image-$LATEST_VERSION$ARCH-patched.qcow2.zip install-image-$LATEST_VERSION$ARCH-patched.qcow2
+        sudo zip install-image-$LATEST_VERSION$ARCH-patched.vmdk.zip install-image-$LATEST_VERSION$ARCH-patched.vmdk
+        sudo zip install-image-$LATEST_VERSION$ARCH-patched.vhd.zip install-image-$LATEST_VERSION$ARCH-patched.vhd
+        sudo zip install-image-$LATEST_VERSION$ARCH-patched.vhdx.zip install-image-$LATEST_VERSION$ARCH-patched.vhdx
+        sudo zip install-image-$LATEST_VERSION$ARCH-patched.vdi.zip install-image-$LATEST_VERSION$ARCH-patched.vdi
+        sudo zip install-image-$LATEST_VERSION$ARCH-patched.img.zip install-image-$LATEST_VERSION$ARCH-patched.img
+
+        sudo rm install-image-$LATEST_VERSION$ARCH-patched.qcow2
+        sudo rm install-image-$LATEST_VERSION$ARCH-patched.vmdk
+        sudo rm install-image-$LATEST_VERSION$ARCH-patched.vhd
+        sudo rm install-image-$LATEST_VERSION$ARCH-patched.vhdx
+        sudo rm install-image-$LATEST_VERSION$ARCH-patched.vdi
+        sudo rm install-image-$LATEST_VERSION$ARCH-patched.img
+
+    - name: Cache chr-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip
+      if: steps.get_latest.outputs.has_new_version == 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
+      id: cache_chr_img
+      uses: actions/cache@v4
+      with:
+        path: chr.img.zip
+        key: chr-${{ env.LATEST_VERSION }}-${{ matrix.arch }}
+
+    - name: Get chr-${{ env.LATEST_VERSION }}${{ env.ARCH }}.zip
+      if: steps.get_latest.outputs.has_new_version == 'true' && steps.cache_chr_img.outputs.cache-hit != 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
+      run: |
+        sudo curl -s -o chr.img.zip https://download.mikrotik.com/routeros/$LATEST_VERSION/chr-$LATEST_VERSION$ARCH.img.zip
+
+    - name: Patch chr-${{ env.LATEST_VERSION }}${{ env.ARCH }}.img
       if: steps.get_latest.outputs.has_new_version == 'true' && (matrix.arch == 'x86' || matrix.arch == 'arm64')
       run: |
-        OVF_TEMPLATE='<?xml version="1.0" encoding="UTF-8"?>
-        <Envelope vmw:buildId="build-18663434" xmlns="http://schemas.dmtf.org/ovf/envelope/1" xmlns:cim="http://schemas.dmtf.org/wbem/wscim/1/common" xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1" xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData" xmlns:vmw="http://www.vmware.com/schema/ovf" xmlns:vssd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-          <References>
-            <File ovf:href="{VMDK_FILE}" ovf:id="file1" ovf:size="{FILE_SIZE}"/>
-          </References>
-          <DiskSection>
-            <Info>Virtual disk information</Info>
-            <Disk ovf:capacity="{CAPACITY_MB}" ovf:capacityAllocationUnits="byte * 2^20" ovf:diskId="vmdisk1" ovf:fileRef="file1" ovf:format="http://www.vmware.com/interfaces/specifications/vmdk.html#streamOptimized"/>
-          </DiskSection>
-          <NetworkSection>
-            <Info>The list of logical networks</Info>
-            <Network ovf:name="VM Network">
-              <Description>The VM Network network</Description>
-            </Network>
-          </NetworkSection>
-          <VirtualSystem ovf:id="vm">
-            <Info>A virtual machine</Info>
-            <Name>MikroTik_RouterOS_CHR</Name>
-            <OperatingSystemSection ovf:id="100" vmw:osType="other3xLinux64Guest">
-              <Info>The kind of installed guest operating system</Info>
-            </OperatingSystemSection>
-            <VirtualHardwareSection>
-              <Info>Virtual hardware requirements</Info>
-              <System>
-                <vssd:ElementName>Virtual Hardware Family</vssd:ElementName>
-                <vssd:InstanceID>0</vssd:InstanceID>
-                <vssd:VirtualSystemIdentifier>MikroTik_RouterOS_CHR</vssd:VirtualSystemIdentifier>
-                <vssd:VirtualSystemType>vmx-10</vssd:VirtualSystemType>
-              </System>
-              <Item>
-                <rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>
-                <rasd:Description>Number of Virtual CPUs</rasd:Description>
-                <rasd:ElementName>1 virtual CPU(s)</rasd:ElementName>
-                <rasd:InstanceID>1</rasd:InstanceID>
-                <rasd:ResourceType>3</rasd:ResourceType>
-                <rasd:VirtualQuantity>1</rasd:VirtualQuantity>
-              </Item>
-              <Item>
-                <rasd:AllocationUnits>byte * 2^20</rasd:AllocationUnits>
-                <rasd:Description>Memory Size</rasd:Description>
-                <rasd:ElementName>1024MB of memory</rasd:ElementName>
-                <rasd:InstanceID>2</rasd:InstanceID>
-                <rasd:ResourceType>4</rasd:ResourceType>
-                <rasd:VirtualQuantity>1024</rasd:VirtualQuantity>
-              </Item>
-              <Item>
-                <rasd:Address>0</rasd:Address>
-                <rasd:Description>IDE Controller</rasd:Description>
-                <rasd:ElementName>ideController0</rasd:ElementName>
-                <rasd:InstanceID>3</rasd:InstanceID>
-                <rasd:ResourceType>5</rasd:ResourceType>
-              </Item>
-              <Item>
-                <rasd:AddressOnParent>0</rasd:AddressOnParent>
-                <rasd:ElementName>disk0</rasd:ElementName>
-                <rasd:HostResource>ovf:/disk/vmdisk1</rasd:HostResource>
-                <rasd:InstanceID>4</rasd:InstanceID>
-                <rasd:Parent>3</rasd:Parent>
-                <rasd:ResourceType>17</rasd:ResourceType>
-              </Item>
-              <Item>
-                <rasd:AddressOnParent>1</rasd:AddressOnParent>
-                <rasd:AutomaticAllocation>true</rasd:AutomaticAllocation>
-                <rasd:Connection>VM Network</rasd:Connection>
-                <rasd:Description>VmxNet3 ethernet adapter on &quot;VM Network&quot;</rasd:Description>
-                <rasd:ElementName>ethernet0</rasd:ElementName>
-                <rasd:InstanceID>5</rasd:InstanceID>
-                <rasd:ResourceSubType>VmxNet3</rasd:ResourceSubType>
-                <rasd:ResourceType>10</rasd:ResourceType>
-                <vmw:Config ovf:required="false" vmw:key="slotInfo.pciSlotNumber" vmw:value="160"/>
-                <vmw:Config ovf:required="false" vmw:key="connectable.allowGuestControl" vmw:value="true"/>
-              </Item>
-              <Item ovf:required="false">
-                <rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>
-                <rasd:ElementName>video</rasd:ElementName>
-                <rasd:InstanceID>6</rasd:InstanceID>
-                <rasd:ResourceType>24</rasd:ResourceType>
-              </Item>
-              <Item ovf:required="false">
-                <rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>
-                <rasd:ElementName>vmci</rasd:ElementName>
-                <rasd:InstanceID>7</rasd:InstanceID>
-                <rasd:ResourceSubType>vmware.vmci</rasd:ResourceSubType>
-                <rasd:ResourceType>1</rasd:ResourceType>
-              </Item>
-              <vmw:Config ovf:required="false" vmw:key="firmware" vmw:value="{FIRMWARE_TYPE}"/>
-            </VirtualHardwareSection>
-            <AnnotationSection ovf:required="false">
-              <Info>A human-readable annotation</Info>
-              <Annotation>MikroTik RouterOS CHR v7.19.4</Annotation>
-            </AnnotationSection>
-          </VirtualSystem>
-        </Envelope>' 
+        sudo unzip chr.img.zip
         sudo modprobe nbd
-        sudo apt-get install -y qemu-utils > /dev/null
-        truncate --size 128M chr-$LATEST_VERSION$ARCH.img
-        sgdisk --clear --set-alignment=2 \
-            --new=1::+32M --typecode=1:8300 --change-name=1:"RouterOS Boot" --attributes=1:set:2 \
-            --new=2::-0 --typecode=2:8300 --change-name=2:"RouterOS" \
-            --gpttombr=1:2 \
-            chr-$LATEST_VERSION$ARCH.img
-        dd if=chr-$LATEST_VERSION$ARCH.img of=pt.bin bs=1 count=66 skip=446
-        echo -e "\x80" | dd of=pt.bin  bs=1 count=1  conv=notrunc
-        sgdisk --mbrtogpt --clear --set-alignment=2 \
-            --new=1::+32M --typecode=1:8300 --change-name=1:"RouterOS Boot" --attributes=1:set:2 \
-            --new=2::-0 --typecode=2:8300 --change-name=2:"RouterOS" \
-            chr-$LATEST_VERSION$ARCH.img
-        dd if=chr.img of=chr-$LATEST_VERSION$ARCH.img bs=1 count=446 conv=notrunc
-        dd if=pt.bin of=chr-$LATEST_VERSION$ARCH.img  bs=1 count=66 seek=446 conv=notrunc
         sudo qemu-nbd -c /dev/nbd0 -f raw chr-$LATEST_VERSION$ARCH.img
-        sudo mkfs.vfat -n "Boot" /dev/nbd0p1
-        sudo mkfs.ext4 -F -L "RouterOS"  -m 0 /dev/nbd0p2
-        sudo mkdir -p ./img/{boot,routeros}
-        sudo mount /dev/nbd0p1 ./img/boot/
+        sudo mkdir -p chr/{boot,routeros}
+        sudo mount /dev/nbd0p1 chr/boot/
         if [ "${{ matrix.arch }}" == "x86" ]; then
-          sudo cp chr.img chr-$LATEST_VERSION$ARCH-legacy-bios.img 
-          sudo qemu-nbd -c /dev/nbd1 -f raw chr-$LATEST_VERSION$ARCH-legacy-bios.img
-          sudo -E python3 patch.py block /dev/nbd1p1 EFI/BOOT/BOOTX64.EFI
-          sudo mkdir -p ./chr/{boot,routeros}
-          sudo mount /dev/nbd1p1 ./chr/boot/
-          sudo mkdir -p  ./img/boot/EFI/BOOT
-          sudo cp ./chr/boot/EFI/BOOT/BOOTX64.EFI ./img/boot/EFI/BOOT/BOOTX64.EFI
-          sudo umount /dev/nbd1p1
-          sudo shred -v -n 1 -z /dev/nbd1p2 
-          sudo mkfs.ext4 -F -L "RouterOS"  -m 0 /dev/nbd1p2
-          sudo mount /dev/nbd1p2 ./chr/routeros/
-          sudo mkdir -p ./chr/routeros/{var/pdb/{system,option},boot,rw/disk}
-          sudo cp ./all_packages/option-$LATEST_VERSION$ARCH.npk ./chr/routeros/var/pdb/option/image
-          sudo cp ./all_packages/routeros-$LATEST_VERSION$ARCH.npk ./chr/routeros/var/pdb/system/image
-          echo -e '#!/bin/sh\n# This script will be executed *before* RouterOS *loader* start.\n# You can put your own initialization stuff in here\n' | sudo tee ./chr/routeros/rw/disk/rc.local
-          sudo umount /dev/nbd1p2
-          sudo qemu-nbd -d /dev/nbd1
-          sudo rm -rf ./chr
-
-          sudo qemu-img convert -f raw -O qcow2 chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios.qcow2
-          sudo qemu-img convert -f raw -O vmdk chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios.vmdk
-          sudo qemu-img convert -f raw -O vpc chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios.vhd
-          sudo qemu-img convert -f raw -O vhdx chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios.vhdx
-          sudo qemu-img convert -f raw -O vdi chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios.vdi
-          
-          sudo qemu-img convert -f raw -O vmdk -o subformat=streamOptimized chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios-disk1.vmdk
-          VMDK=chr-$LATEST_VERSION$ARCH-legacy-bios-disk1.vmdk
-          OVF=chr-$LATEST_VERSION$ARCH-legacy-bios.ovf
-          OVA=chr-$LATEST_VERSION$ARCH-legacy-bios.ova
-          FILE_SIZE=$(stat -c %s "$VMDK")
-          VIRTUAL_SIZE=$(qemu-img info --output=json "$VMDK" | jq '.["virtual-size"]' | head -n 1)
-          CAPACITY_MB=$((VIRTUAL_SIZE / 1024 / 1024))
-          POPULATED_SIZE=$FILE_SIZE
-          FIRMWARE_TYPE="bios" 
-          echo "$OVF_TEMPLATE" | sudo sed -e "s|{VMDK_FILE}|$VMDK|g" \
-              -e "s|{FILE_SIZE}|$FILE_SIZE|g" \
-              -e "s|{CAPACITY_MB}|$CAPACITY_MB|g" \
-              -e "s|{POPULATED_SIZE}|$POPULATED_SIZE|g" \
-              -e "s|{FIRMWARE_TYPE}|$FIRMWARE_TYPE|g" |sudo tee $OVF
-          sudo tar -cvf "$OVA" "$OVF" "$VMDK"
-          sudo rm $VMDK
-          sudo rm $OVF
-          sudo zip $OVA.zip $OVA
-          sudo rm $OVA
-          
-          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.qcow2.zip chr-$LATEST_VERSION$ARCH-legacy-bios.qcow2
-          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.vmdk.zip chr-$LATEST_VERSION$ARCH-legacy-bios.vmdk
-          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.vhd.zip chr-$LATEST_VERSION$ARCH-legacy-bios.vhd
-          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.vhdx.zip chr-$LATEST_VERSION$ARCH-legacy-bios.vhdx
-          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.vdi.zip chr-$LATEST_VERSION$ARCH-legacy-bios.vdi
-          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.img.zip chr-$LATEST_VERSION$ARCH-legacy-bios.img
-
-          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.qcow2
-          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.vmdk
-          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.vhd
-          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.vhdx
-          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.vdi
-          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.img
-
+          sudo mkdir -p chr/boot/BOOT
+          sudo -E python3 patch.py kernel chr/boot/EFI/BOOT/BOOTX64.EFI
+          sudo extlinux --install -H 64 -S 32 chr/boot/BOOT
+          echo -e "default system\nlabel system\n\tkernel /EFI/BOOT/BOOTX64.EFI\n\tappend load_ramdisk=1 root=/dev/ram0 quiet" | sudo tee chr/boot/BOOT/syslinux.cfg > /dev/null
         elif [ "${{ matrix.arch }}" == "arm64" ]; then
-          sudo qemu-nbd -c /dev/nbd1 -f raw chr.img
-          sudo mkdir -p ./chr/boot
-          sudo mount /dev/nbd1p1 ./chr/boot/
-          sudo -E python3 patch.py kernel ./chr/boot/EFI/BOOT/BOOTAA64.EFI -O ./BOOTAA64.EFI 
-          sudo mkdir -p  ./img/boot/EFI/BOOT
-          sudo cp ./BOOTAA64.EFI ./img/boot/EFI/BOOT/BOOTAA64.EFI
-          sudo umount /dev/nbd1p1
-          sudo rm -rf ./chr
-          sudo qemu-nbd -d /dev/nbd1
+          sudo -E python3 patch.py kernel chr/boot/EFI/BOOT/BOOTAA64.EFI
         fi
         sudo umount /dev/nbd0p1
-        sudo mount  /dev/nbd0p2 ./img/routeros/
-        sudo mkdir -p ./img/routeros/{var/pdb/{system,option},boot,rw}
-        sudo cp ./all_packages/option-$LATEST_VERSION$ARCH.npk ./img/routeros/var/pdb/option/image
-        sudo cp ./all_packages/routeros-$LATEST_VERSION$ARCH.npk ./img/routeros/var/pdb/system/image
+        sudo mount /dev/nbd0p2 chr/routeros/
+        sudo -E python3 patch.py npk chr/routeros/var/pdb/system/image
         sudo umount /dev/nbd0p2
-        sudo rm -rf ./img
+        sudo rm -rf chr/
         sudo qemu-nbd -d /dev/nbd0
+        sudo mv chr-$LATEST_VERSION$ARCH.img chr-$LATEST_VERSION$ARCH-patched.img
 
-        sudo qemu-img convert -f raw -O qcow2 chr-$LATEST_VERSION$ARCH.img chr-$LATEST_VERSION$ARCH.qcow2
-        sudo qemu-img convert -f raw -O vmdk  chr-$LATEST_VERSION$ARCH.img chr-$LATEST_VERSION$ARCH.vmdk
-        sudo qemu-img convert -f raw -O vpc chr-$LATEST_VERSION$ARCH.img chr-$LATEST_VERSION$ARCH.vhd
-        sudo qemu-img convert -f raw -O vhdx chr-$LATEST_VERSION$ARCH.img chr-$LATEST_VERSION$ARCH.vhdx
-        sudo qemu-img convert -f raw -O vdi chr-$LATEST_VERSION$ARCH.img chr-$LATEST_VERSION$ARCH.vdi
+        sudo qemu-img convert -f raw -O qcow2 chr-$LATEST_VERSION$ARCH-patched.img chr-$LATEST_VERSION$ARCH-patched.qcow2
+        sudo qemu-img convert -f raw -O vmdk chr-$LATEST_VERSION$ARCH-patched.img chr-$LATEST_VERSION$ARCH-patched.vmdk
+        sudo qemu-img convert -f raw -O vpc chr-$LATEST_VERSION$ARCH-patched.img chr-$LATEST_VERSION$ARCH-patched.vhd
+        sudo qemu-img convert -f raw -O vhdx chr-$LATEST_VERSION$ARCH-patched.img chr-$LATEST_VERSION$ARCH-patched.vhdx
+        sudo qemu-img convert -f raw -O vdi chr-$LATEST_VERSION$ARCH-patched.img chr-$LATEST_VERSION$ARCH-patched.vdi
 
-        sudo qemu-img convert -f raw -O vmdk -o subformat=streamOptimized chr-$LATEST_VERSION$ARCH.img chr-$LATEST_VERSION$ARCH-disk1.vmdk
-        VMDK=chr-$LATEST_VERSION$ARCH-disk1.vmdk
-        OVF=chr-$LATEST_VERSION$ARCH.ovf
-        OVA=chr-$LATEST_VERSION$ARCH.ova
-        FILE_SIZE=$(stat -c %s "$VMDK")
-        VIRTUAL_SIZE=$(qemu-img info --output=json "$VMDK" | jq '.["virtual-size"]' | head -n 1)
-        CAPACITY_MB=$((VIRTUAL_SIZE / 1024 / 1024))
-        POPULATED_SIZE=$FILE_SIZE
-        FIRMWARE_TYPE="efi" 
-        echo "$OVF_TEMPLATE" | sudo sed -e "s|{VMDK_FILE}|$VMDK|g" \
-            -e "s|{FILE_SIZE}|$FILE_SIZE|g" \
-            -e "s|{CAPACITY_MB}|$CAPACITY_MB|g" \
-            -e "s|{POPULATED_SIZE}|$POPULATED_SIZE|g" \
-            -e "s|{FIRMWARE_TYPE}|$FIRMWARE_TYPE|g" |sudo tee $OVF
-        sudo tar -cvf "$OVA" "$OVF" "$VMDK"
-        sudo rm $VMDK
-        sudo rm $OVF
-        sudo zip $OVA.zip $OVA
-        sudo rm $OVA
+        sudo zip chr-$LATEST_VERSION$ARCH-patched.qcow2.zip chr-$LATEST_VERSION$ARCH-patched.qcow2
+        sudo zip chr-$LATEST_VERSION$ARCH-patched.vmdk.zip chr-$LATEST_VERSION$ARCH-patched.vmdk
+        sudo zip chr-$LATEST_VERSION$ARCH-patched.vhd.zip chr-$LATEST_VERSION$ARCH-patched.vhd
+        sudo zip chr-$LATEST_VERSION$ARCH-patched.vhdx.zip chr-$LATEST_VERSION$ARCH-patched.vhdx
+        sudo zip chr-$LATEST_VERSION$ARCH-patched.vdi.zip chr-$LATEST_VERSION$ARCH-patched.vdi
+        sudo zip chr-$LATEST_VERSION$ARCH-patched.img.zip chr-$LATEST_VERSION$ARCH-patched.img
 
-        sudo zip chr-$LATEST_VERSION$ARCH.qcow2.zip chr-$LATEST_VERSION$ARCH.qcow2
-        sudo zip chr-$LATEST_VERSION$ARCH.vmdk.zip chr-$LATEST_VERSION$ARCH.vmdk
-        sudo zip chr-$LATEST_VERSION$ARCH.vhd.zip chr-$LATEST_VERSION$ARCH.vhd
-        sudo zip chr-$LATEST_VERSION$ARCH.vhdx.zip chr-$LATEST_VERSION$ARCH.vhdx
-        sudo zip chr-$LATEST_VERSION$ARCH.vdi.zip chr-$LATEST_VERSION$ARCH.vdi
-        sudo zip chr-$LATEST_VERSION$ARCH.img.zip chr-$LATEST_VERSION$ARCH.img
-
-        sudo rm chr-$LATEST_VERSION$ARCH.qcow2
-        sudo rm chr-$LATEST_VERSION$ARCH.vmdk
-        sudo rm chr-$LATEST_VERSION$ARCH.vhd
-        sudo rm chr-$LATEST_VERSION$ARCH.vhdx
-        sudo rm chr-$LATEST_VERSION$ARCH.vdi
-        sudo rm chr-$LATEST_VERSION$ARCH.img
-
+        sudo rm chr-$LATEST_VERSION$ARCH-patched.qcow2
+        sudo rm chr-$LATEST_VERSION$ARCH-patched.vmdk
+        sudo rm chr-$LATEST_VERSION$ARCH-patched.vhd
+        sudo rm chr-$LATEST_VERSION$ARCH-patched.vhdx
+        sudo rm chr-$LATEST_VERSION$ARCH-patched.vdi
+        sudo rm chr-$LATEST_VERSION$ARCH-patched.img
     
     - name: Cache all_packages${{ env.ARCH }}-${{ env.LATEST_VERSION }}.zip
       if: steps.get_latest.outputs.has_new_version == 'true' && matrix.arch != 'x86' && matrix.arch != 'arm64'
