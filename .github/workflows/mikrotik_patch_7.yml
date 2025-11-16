@@ -336,7 +336,6 @@ jobs:
         sudo umount /dev/nbd0p2
         sudo rm -rf chr/
         sudo qemu-nbd -d /dev/nbd0
-        sudo mv chr-$LATEST_VERSION$ARCH.img chr-$LATEST_VERSION$ARCH.img
 
         sudo qemu-img convert -f raw -O qcow2 chr-$LATEST_VERSION$ARCH.img chr-$LATEST_VERSION$ARCH.qcow2
         sudo qemu-img convert -f raw -O vmdk chr-$LATEST_VERSION$ARCH.img chr-$LATEST_VERSION$ARCH.vmdk
