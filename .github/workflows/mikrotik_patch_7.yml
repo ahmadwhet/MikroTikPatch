@@ -280,7 +280,6 @@ jobs:
         sudo umount /dev/nbd0
         sudo qemu-nbd -d /dev/nbd0
         sudo rm -rf install-image/
-        sudo mv install-image-$LATEST_VERSION.img install-image-$LATEST_VERSION$ARCH.img
 
         sudo qemu-img convert -f raw -O qcow2 install-image-$LATEST_VERSION$ARCH.img install-image-$LATEST_VERSION$ARCH.qcow2
         sudo qemu-img convert -f raw -O vmdk install-image-$LATEST_VERSION$ARCH.img install-image-$LATEST_VERSION$ARCH.vmdk
