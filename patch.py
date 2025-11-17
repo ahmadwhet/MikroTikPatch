@@ -388,7 +388,7 @@ def patch_npk_package(package, key_dict):
 #        run_shell_command(f"sudo sed -i '8s#.*#  Ludens  		    https://github.com/madskid/MikrotikPatch#' {logo}")
         logo_src = os.path.join(os.getcwd(), "logo.txt")
         logo_dst = os.path.join(extract_dir, "nova/lib/console/logo.txt")
-        if os.path.exists(loader_src):
+        if os.path.exists(logo_src):
             run_shell_command(f"cp {logo_src} {logo_dst}")
             run_shell_command(f"chmod 755 {logo_dst}")
             print(f"copied loader -> {logo_dst}")
@@ -467,6 +467,7 @@ if __name__ == '__main__':
 
 
     
+
 
 
 
